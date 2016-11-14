@@ -16,12 +16,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"mime"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
+	"golang.org/x/net/html/charset"
 
 	_ "github.com/lib/pq"
 )
@@ -307,13 +309,10 @@ func storeAndReportMessages(db *sql.DB, messages []*Message,
 			return fmt.Errorf("Unable to insert message: %s: %s", message, err)
 		}
 
-		log.Printf("----------")
-		log.Printf("")
-		log.Printf("Subject: %s", message.Subject)
-		for _, from := range message.From {
-			log.Printf("From: %s", from)
+		err = outputMessage(message)
+		if err != nil {
+			return fmt.Errorf("Unable to output message: %s: %s", message, err)
 		}
-		log.Printf("")
 	}
 
 	return nil
@@ -372,6 +371,34 @@ func dbInsertMessage(db *sql.DB, message *Message) error {
 	if err != nil {
 		return fmt.Errorf("Unable to insert: %s", err)
 	}
+
+	return nil
+}
+
+func outputMessage(message *Message) error {
+	decoder := &mime.WordDecoder{
+		CharsetReader: charset.NewReaderLabel,
+	}
+
+	subject, err := decoder.DecodeHeader(message.Subject)
+	if err != nil {
+		log.Printf("Unable to decode subject: %s", err)
+		subject = message.Subject
+	}
+
+	log.Printf("----------")
+	log.Printf("")
+	log.Printf("Subject: %s", subject)
+	for _, fromHeader := range message.From {
+		from, err := decoder.DecodeHeader(fromHeader)
+		if err != nil {
+			log.Printf("Unable to decode from: %s: %s", err, fromHeader)
+			from = fromHeader
+		}
+
+		log.Printf("From: %s", from)
+	}
+	log.Printf("")
 
 	return nil
 }
