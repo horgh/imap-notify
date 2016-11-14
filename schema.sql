@@ -1,0 +1,12 @@
+CREATE TABLE imap_notify (
+  id SERIAL NOT NULL,
+
+  message_id VARCHAR NOT NULL,
+  subject VARCHAR NOT NULL,
+  from_addresses VARCHAR NOT NULL,
+  internal_date TIMESTAMP WITH TIME ZONE NOT NULL,
+
+  create_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+
+  PRIMARY KEY (id)
+);
