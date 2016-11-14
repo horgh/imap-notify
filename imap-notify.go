@@ -299,6 +299,7 @@ func storeAndReportMessages(db *sql.DB, messages []*Message,
 		if len(dbMessages) > 1 {
 			log.Printf("WARNING: Multiple matching messages in the database! %s",
 				message)
+			continue
 		}
 
 		err = dbInsertMessage(db, message)
