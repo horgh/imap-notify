@@ -90,6 +90,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to connect to the database: %s", err)
 	}
+	defer db.Close()
 
 	err = storeAndReportMessages(db, messages, args.Verbose)
 	if err != nil {
