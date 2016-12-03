@@ -17,6 +17,7 @@ import (
 	"io/ioutil"
 	"log"
 	"mime"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -90,7 +91,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to connect to the database: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		err := db.Close()
+		if err != nil {
+			log.Printf("Error closing database connection: %s", err)
+		}
+	}()
 
 	err = storeAndReportMessages(db, messages, args.Verbose)
 	if err != nil {
@@ -193,7 +199,9 @@ func readFile(file string) (string, error) {
 func fetchMessages(host string, port int, user, pass,
 	mailbox string, verbose bool) ([]*Message, error) {
 
-	client, err := client.DialTLS(fmt.Sprintf("%s:%d", host, port), nil)
+	dialer := &net.Dialer{Timeout: 2 * time.Minute}
+	address := fmt.Sprintf("%s:%d", host, port)
+	client, err := client.DialWithDialerTLS(dialer, address, nil)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to connect to IMAP server: %s", err)
 	}
@@ -206,7 +214,17 @@ func fetchMessages(host string, port int, user, pass,
 	// return values are sufficient.
 	client.ErrorLog = log.New(ioutil.Discard, "", 0)
 
-	defer client.Logout()
+	defer func() {
+		err := client.Logout()
+		if err != nil {
+			log.Printf("Error closing client connection: %s", err)
+		}
+	}()
+
+	err = client.Conn().SetDeadline(time.Now().Add(time.Minute))
+	if err != nil {
+		return nil, fmt.Errorf("Unable to set deadline: %s", err)
+	}
 
 	err = client.Login(user, pass)
 	if err != nil {
