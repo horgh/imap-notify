@@ -199,36 +199,56 @@ func readFile(file string) (string, error) {
 func fetchMessages(host string, port int, user, pass,
 	mailbox string, verbose bool) ([]*Message, error) {
 
-	dialer := &net.Dialer{Timeout: 2 * time.Minute}
 	address := fmt.Sprintf("%s:%d", host, port)
+
+	if verbose {
+		log.Printf("Connecting to %s...", address)
+	}
+
+	timeout := 30 * time.Second
+
+	dialer := &net.Dialer{Timeout: timeout}
 	client, err := client.DialWithDialerTLS(dialer, address, nil)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to connect to IMAP server: %s", err)
 	}
 
-	// Default logger uses the default logger.
-	// By default it logs messages I don't care to see, such as:
-	// imap/client: 2016/11/14 11:57:28 response has not been handled: &{* [CAPABILITY IMAP4rev1 UNSELECT IDLE NAMESPACE QUOTA ID XLIST CHILDREN X-GM-EXT-1 UIDPLUS COMPRESS=DEFLATE ENABLE MOVE CONDSTORE ESEARCH UTF8=ACCEPT LIST-EXTENDED LIST-STATUS LITERAL- APPENDLIMIT=35651584]}
-	// imap/client: 2016/11/14 11:57:28 response has not been handled: &{* OK HIGHESTMODSEQ [5808442] }
-	// Unfortunately I don't see another way to hide these... I hope the error
-	// return values are sufficient.
-	client.ErrorLog = log.New(ioutil.Discard, "", 0)
+	client.Timeout = timeout
+
+	if verbose {
+		log.Printf("Connected to %s", address)
+	}
 
 	defer func() {
+		if verbose {
+			log.Printf("Logging out...")
+		}
+
 		err := client.Logout()
 		if err != nil {
 			log.Printf("Error closing client connection: %s", err)
+			return
+		}
+
+		if verbose {
+			log.Printf("Logged out.")
 		}
 	}()
 
-	err = client.Conn().SetDeadline(time.Now().Add(time.Minute))
-	if err != nil {
-		return nil, fmt.Errorf("Unable to set deadline: %s", err)
+	if verbose {
+		log.Printf("Logging in as %s...", user)
 	}
 
 	err = client.Login(user, pass)
 	if err != nil {
+		if verbose {
+			log.Printf("Unable to login: %s", err)
+		}
 		return nil, fmt.Errorf("Unable to login to IMAP: %s", err)
+	}
+
+	if verbose {
+		log.Printf("Logged in as %s", user)
 	}
 
 	mbox, err := client.Select(mailbox, true)
